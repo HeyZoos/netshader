@@ -5,6 +5,25 @@ use yew::services::ConsoleService;
 use yew::worker::{Agent, AgentLink, Bridge, Context, HandlerId};
 use yew::{html, Component, ComponentLink, Html, InputData, Properties, ShouldRender};
 
+pub const DEFAULT_VERTEX: &str = r#"attribute vec3 position;
+uniform mat4 Pmatrix;
+uniform mat4 Vmatrix;
+uniform mat4 Mmatrix;
+attribute vec3 color;
+varying vec3 vColor;
+void main() {
+    gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);
+    vColor = color;
+}
+"#;
+
+pub const DEFAULT_FRAGMENT: &str = r#"precision mediump float;
+varying vec3 vColor;
+void main() {
+    gl_FragColor = vec4(vColor, 1.);
+}
+"#;
+
 struct Model {
     link: ComponentLink<Self>,
     worker: Box<dyn Bridge<Worker>>,
@@ -54,7 +73,7 @@ impl Component for Model {
                             <div class="h-100 border rounded"></div>
                         </div>
                         <div class="h-75 border rounded">
-                            <canvas id="canvas" class="h-100 w-100"></canvas>
+                            <WebGlComponent />
                         </div>
                     </div>
                 </div>
@@ -216,6 +235,84 @@ impl Component for EditorComponent {
     fn view(&self) -> Html {
         html! {
             <div id={ &self.name } class={ &self.class }></div>
+        }
+    }
+}
+
+struct WebGlService;
+
+impl WebGlService {
+    fn new() -> Self {
+        js! {
+            Promise.resolve().then(() => {
+                window.canvas = document.getElementById("canvas");
+                window.gl = window.canvas.getContext("webgl");
+            });
+        }
+
+        Self {}
+    }
+
+    fn create_shader(&self, name: &str, source: &str) {
+        js! {
+            window[@{ name }] = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(window[@{ name }], @{ source });
+            gl.compileShader(window[@{ name }]);
+        }
+    }
+
+    fn create_program(&self, name: &str, shader_names: Vec<&str>) {
+        js! {
+            window[@{ name }] = gl.createProgram();
+        }
+
+        for shader_name in shader_names.iter() {
+            js! {
+                console.log(@{ shader_name });
+                gl.attachShader(window[@{ name }], @{ shader_name });
+            }
+        }
+
+        js! {
+            gl.linkProgram(window[@{ name }]);
+        }
+    }
+}
+
+struct WebGlComponent {
+    gl: WebGlService,
+    link: ComponentLink<Self>,
+}
+
+struct WebGlComponentMsg {}
+
+impl Component for WebGlComponent {
+    type Message = WebGlComponentMsg;
+    type Properties = ();
+
+    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        Self {
+            gl: WebGlService::new(),
+            link,
+        }
+    }
+
+    fn update(&mut self, _: Self::Message) -> ShouldRender {
+        self.gl.create_shader("vertex", DEFAULT_VERTEX);
+        self.gl.create_shader("fragment", DEFAULT_FRAGMENT);
+
+        self.gl
+            .create_program("program", vec!["vertex", "fragment"]);
+        true
+    }
+
+    fn view(&self) -> Html {
+        let onclick = self.link.callback(|_| WebGlComponentMsg {});
+        html! {
+            <>
+                <canvas id="canvas" class="h-100 w-100"></canvas>
+                <button onclick=onclick>{ "Update Canvas" }</button>
+            </>
         }
     }
 }
