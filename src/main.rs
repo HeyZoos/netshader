@@ -9,7 +9,6 @@ struct Model {
     link: ComponentLink<Self>,
     worker: Box<dyn Bridge<Worker>>,
     console: ConsoleService,
-    ace: AceService,
 }
 
 impl Component for Model {
@@ -23,14 +22,10 @@ impl Component for Model {
 
         let worker = Worker::bridge(callback);
 
-        let mut ace = AceService::new();
-        ace.edit("editor");
-
         Self {
             link,
             worker,
             console: ConsoleService::new(),
-            ace,
         }
     }
 
@@ -45,15 +40,24 @@ impl Component for Model {
     }
 
     fn view(&self) -> Html {
-        let onclick = self.link.callback(|_| Msg {
-            value: "foo".to_string(),
-        });
-
         html! {
-            <div>
-                <div id="editor"></div>
-                <button onclick=onclick>{ "Hello" }</button>
-                <Variable name="foo" class="vec3" value="foo" />
+            <div class="container-fluid h-100">
+                <div class="row h-100">
+                    <div class="col-sm py-4 pl-4 pr-4">
+                        <div class="h-50 pb-4">
+                            <EditorComponent name="fragment-editor" class="border rounded h-100 w-100" />
+                        </div>
+                        <EditorComponent name="vertex-editor" class="border rounded h-50 w-100" />
+                    </div>
+                    <div class="col-sm py-4 pl-0 pr-4">
+                        <div class="h-25 pb-4">
+                            <div class="h-100 border rounded"></div>
+                        </div>
+                        <div class="h-75 border rounded">
+                            <canvas id="canvas" class="h-100 w-100"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         }
     }
@@ -110,7 +114,6 @@ impl Component for Variable {
 
         html! {
             <div>
-                <div id="editor">{"Hello world!"}</div>
                 <p>{ &self.name }</p>
                 <p>{ &self.class }</p>
                 <input oninput=oninput>{ &self.value }</input>
@@ -155,39 +158,65 @@ impl Agent for Worker {
     }
 }
 
-struct AceService(stdweb::Value);
+struct AceService;
 
 impl AceService {
     pub fn new() -> Self {
-        let lib = js! {
-            return ace;
-        };
-
-        Self(lib)
+        Self {}
     }
 
-    pub fn edit(&mut self, id: &str) -> AceServiceEditor {
-        let lib = &self.0;
-
-        let editor = js! {
-            let ace = @{lib};
-            return Promise.resolve().then(() => ace.edit(@{id}));
+    pub fn edit(&mut self, id: &str) {
+        js! {
+            Promise.resolve().then(() => {
+                window.ace = ace;
+                window.editor = window.ace.edit(@{id});
+                window.editor.setTheme("ace/theme/tomorrow_night");
+                window.editor.getSession().setMode("ace/mode/javascript");
+                window.editor.setValue("Hello World");
+                window.editor.clearSelection();
+            });
         };
-
-        AceServiceEditor(editor)
     }
 }
 
-struct AceServiceEditor(stdweb::Value);
+struct EditorComponent {
+    ace: AceService,
+    link: ComponentLink<Self>,
+    name: String,
+    class: String,
+}
 
-impl AceServiceEditor {
-    fn set_theme(&mut self, name: &str) {
-        let lib = &self.0;
+#[derive(Clone, Properties)]
+struct EditorComponentProperties {
+    name: String,
+    class: String,
+}
 
-        js! {
-            let editor = @{lib};
-            editor.setTheme(@{name});
-        };
+impl Component for EditorComponent {
+    type Message = ();
+    type Properties = EditorComponentProperties;
+
+    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let mut ace = AceService::new();
+
+        ace.edit(&props.name);
+
+        Self {
+            ace,
+            link,
+            name: props.name,
+            class: props.class,
+        }
+    }
+
+    fn update(&mut self, _: Self::Message) -> ShouldRender {
+        true
+    }
+
+    fn view(&self) -> Html {
+        html! {
+            <div id={ &self.name } class={ &self.class }></div>
+        }
     }
 }
 
