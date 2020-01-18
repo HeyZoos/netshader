@@ -253,9 +253,18 @@ impl WebGlService {
         Self {}
     }
 
-    fn create_shader(&self, name: &str, source: &str) {
+    fn create_shader(&self, name: &str, source: &str, vertex: bool) {
+        if vertex {
+            js! {
+                window[@{ name }] = gl.createShader(gl.VERTEX_SHADER);
+            }
+        } else {
+            js! {
+                window[@{ name }] = gl.createShader(gl.FRAGMENT_SHADER);
+            }
+        }
+
         js! {
-            window[@{ name }] = gl.createShader(gl.VERTEX_SHADER);
             gl.shaderSource(window[@{ name }], @{ source });
             gl.compileShader(window[@{ name }]);
         }
@@ -269,7 +278,7 @@ impl WebGlService {
         for shader_name in shader_names.iter() {
             js! {
                 console.log(@{ shader_name });
-                gl.attachShader(window[@{ name }], @{ shader_name });
+                gl.attachShader(window[@{ name }], window[@{ shader_name }]);
             }
         }
 
@@ -298,8 +307,8 @@ impl Component for WebGlComponent {
     }
 
     fn update(&mut self, _: Self::Message) -> ShouldRender {
-        self.gl.create_shader("vertex", DEFAULT_VERTEX);
-        self.gl.create_shader("fragment", DEFAULT_FRAGMENT);
+        self.gl.create_shader("vertex", DEFAULT_VERTEX, true);
+        self.gl.create_shader("fragment", DEFAULT_FRAGMENT, false);
 
         self.gl
             .create_program("program", vec!["vertex", "fragment"]);
