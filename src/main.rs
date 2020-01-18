@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use stdweb::js;
 use yew::agent::Bridged;
 use yew::services::ConsoleService;
 use yew::worker::{Agent, AgentLink, Bridge, Context, HandlerId};
@@ -8,6 +9,7 @@ struct Model {
     link: ComponentLink<Self>,
     worker: Box<dyn Bridge<Worker>>,
     console: ConsoleService,
+    ace: AceService,
 }
 
 impl Component for Model {
@@ -21,10 +23,14 @@ impl Component for Model {
 
         let worker = Worker::bridge(callback);
 
+        let mut ace = AceService::new();
+        ace.edit("editor");
+
         Self {
             link,
             worker,
             console: ConsoleService::new(),
+            ace,
         }
     }
 
@@ -45,6 +51,7 @@ impl Component for Model {
 
         html! {
             <div>
+                <div id="editor"></div>
                 <button onclick=onclick>{ "Hello" }</button>
                 <Variable name="foo" class="vec3" value="foo" />
             </div>
@@ -81,6 +88,7 @@ impl Component for Variable {
         });
 
         let worker = Worker::bridge(callback);
+
         Self {
             name: props.name,
             class: props.class,
@@ -102,6 +110,7 @@ impl Component for Variable {
 
         html! {
             <div>
+                <div id="editor">{"Hello world!"}</div>
                 <p>{ &self.name }</p>
                 <p>{ &self.class }</p>
                 <input oninput=oninput>{ &self.value }</input>
@@ -143,6 +152,42 @@ impl Agent for Worker {
 
     fn handle_input(&mut self, _: Self::Input, _: HandlerId) {
         self.console.log("[Context Worker] Received input!");
+    }
+}
+
+struct AceService(stdweb::Value);
+
+impl AceService {
+    pub fn new() -> Self {
+        let lib = js! {
+            return ace;
+        };
+
+        Self(lib)
+    }
+
+    pub fn edit(&mut self, id: &str) -> AceServiceEditor {
+        let lib = &self.0;
+
+        let editor = js! {
+            let ace = @{lib};
+            return Promise.resolve().then(() => ace.edit(@{id}));
+        };
+
+        AceServiceEditor(editor)
+    }
+}
+
+struct AceServiceEditor(stdweb::Value);
+
+impl AceServiceEditor {
+    fn set_theme(&mut self, name: &str) {
+        let lib = &self.0;
+
+        js! {
+            let editor = @{lib};
+            editor.setTheme(@{name});
+        };
     }
 }
 
