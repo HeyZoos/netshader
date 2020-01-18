@@ -1,13 +1,17 @@
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
-struct Model { }
+mod components;
+
+use components::Variable;
+
+struct Model {}
 
 impl Component for Model {
     type Message = ();
     type Properties = ();
 
     fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
-        Model {}
+        Self {}
     }
 
     fn update(&mut self, _: Self::Message) -> ShouldRender {
@@ -15,7 +19,9 @@ impl Component for Model {
     }
 
     fn view(&self) -> Html {
-        html! { }
+        html! {
+            <Variable name="foo" class="vec3" value="foo" />
+        }
     }
 }
 
