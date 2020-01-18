@@ -180,6 +180,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "netshader"
 version = "0.1.0"
 dependencies = [
+ "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "yew 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
