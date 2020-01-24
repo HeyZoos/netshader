@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::rc::Rc;
 use stdweb::js;
 use yew::agent::Bridged;
-use yew::services::ConsoleService;
+use yew::services::render::RenderTask;
+use yew::services::{ConsoleService, RenderService};
 use yew::worker::{Agent, AgentLink, Bridge, Context, HandlerId};
 use yew::{html, Component, ComponentLink, Html, InputData, Properties, ShouldRender};
 
@@ -25,9 +28,29 @@ void main() {
 "#;
 
 struct Model {
-    link: ComponentLink<Self>,
+    link: Rc<ComponentLink<Self>>,
     worker: Box<dyn Bridge<Worker>>,
     console: ConsoleService,
+    animator: Rc<RefCell<Animator>>
+}
+
+struct Animator {
+    console: ConsoleService,
+    link: Rc<ComponentLink<Model>>,
+    render: RenderService,
+}
+
+impl Animator {
+    fn animate(&mut self, animator: Rc<RefCell<Self>>) {
+        self.console.log("Hello");
+
+        let callback = self.link.callback(move |time| {
+            animator.borrow_mut().animate(animator.clone());
+            Msg { value: String::from("animate") }
+        });
+
+        self.render.request_animation_frame(callback);
+    }
 }
 
 impl Component for Model {
@@ -35,21 +58,31 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let callback = link.callback(|_| Msg {
+        let worker_callback = link.callback(|_| Msg {
             value: "Message from worker".to_string(),
         });
 
-        let worker = Worker::bridge(callback);
+        let worker = Worker::bridge(worker_callback);
+        let rc_link = Rc::new(link);
+
+        let animator = Rc::new(RefCell::new(Animator {
+            console: ConsoleService::new(),
+            link: rc_link.clone(),
+            render: RenderService::new()
+        }));
 
         Self {
-            link,
+            link: rc_link,
             worker,
             console: ConsoleService::new(),
+            animator
         }
     }
 
-    fn update(&mut self, _: Self::Message) -> ShouldRender {
-        self.console.log("[Model] Received message");
+    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        self.console.log("[Model] Received message.");
+        self.console
+            .log(format!("[Model] &msg.value = {}", &msg.value).as_str());
 
         self.worker.send(Request {
             value: "Message from model".to_string(),
@@ -80,6 +113,17 @@ impl Component for Model {
             </div>
         }
     }
+
+    fn mounted(&mut self) -> ShouldRender {
+        // Kicks off the recursive `animate` function. It will run in the
+        // background, repeatedly invoking the next animation frame.
+        self.animator.borrow_mut().animate(self.animator.clone());
+        true
+    }
+}
+
+struct AnimationCallback {
+    function: dyn Fn(&AnimationCallback, f64)
 }
 
 #[derive(Clone, Properties)]
@@ -270,7 +314,7 @@ impl WebGlService {
         }
     }
 
-    fn create_program(&self, name: &str, shader_names: Vec<&str>) {
+    fn use_shaders(&self, name: &str, shader_names: Vec<&str>) {
         js! {
             window[@{ name }] = gl.createProgram();
         }
@@ -284,6 +328,7 @@ impl WebGlService {
 
         js! {
             gl.linkProgram(window[@{ name }]);
+            gl.useProgram(window[@{ name }]);
         }
     }
 }
@@ -309,9 +354,7 @@ impl Component for WebGlComponent {
     fn update(&mut self, _: Self::Message) -> ShouldRender {
         self.gl.create_shader("vertex", DEFAULT_VERTEX, true);
         self.gl.create_shader("fragment", DEFAULT_FRAGMENT, false);
-
-        self.gl
-            .create_program("program", vec!["vertex", "fragment"]);
+        self.gl.use_shaders("program", vec!["vertex", "fragment"]);
         true
     }
 
