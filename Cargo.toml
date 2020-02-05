@@ -7,6 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+nalgebra = "0.19.0"
+nalgebra-glm = "0.5.0"
 serde = "1.0.104"
 serde_derive = "1.0.104"
 stdweb = "0.4.20"
