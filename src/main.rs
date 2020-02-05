@@ -10,11 +10,9 @@ mod webgl_rendering_context;
 
 use serde::{Deserialize, Serialize};
 use stdweb::js;
-use stdweb::unstable::TryInto;
 use stdweb::web::html_element::CanvasElement;
-use stdweb::web::{document, window, IParentNode};
 use webgl_rendering_context::WebGLRenderingContext;
-use yew::{html, Component, ComponentLink, Html, Properties, ShouldRender};
+use yew::{html, Component, ComponentLink, Html, NodeRef, Properties, ShouldRender};
 
 pub const DEFAULT_VERTEX: &str = r#"attribute vec3 position;
 uniform mat4 Pmatrix;
@@ -35,27 +33,21 @@ void main() {
 }
 "#;
 
-const CANVAS_ID: &str = "render";
-
 struct Model {
-    link: ComponentLink<Self>,
-    canvas: Option<CanvasElement>,
-    context: Option<WebGLRenderingContext>,
+    canvas: NodeRef,
 }
 
 impl Component for Model {
     type Message = ();
     type Properties = ();
 
-    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self {
-            link,
-            canvas: None,
-            context: None,
-        }
+    fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
+        Self { canvas: Default::default() }
     }
 
     fn update(&mut self, _: Self::Message) -> ShouldRender {
+        let canvas = self.canvas.cast::<CanvasElement>().unwrap();
+        let _gl: WebGLRenderingContext = canvas.get_context().unwrap();
         true
     }
 
@@ -74,36 +66,13 @@ impl Component for Model {
                             <div class="h-100 border rounded"></div>
                         </div>
                         <div class="h-75 border rounded">
-                            <canvas id={ CANVAS_ID } class="h-100 w-100"></canvas>
+                            <canvas ref=self.canvas.clone() class="h-100 w-100"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
         }
     }
-
-    fn mounted(&mut self) -> ShouldRender {
-        self.canvas = Some(canvas(CANVAS_ID));
-        self.context = self
-            .canvas
-            .as_ref()
-            .map(|canvas: &CanvasElement| canvas.get_context().unwrap());
-        self.context.as_ref().map(|gl: &WebGLRenderingContext| {
-            gl.clear_color(0.0, 1.0, 0.0, 1.0);
-            gl.clear(WebGLRenderingContext::COLOR_BUFFER_BIT);
-        });
-
-        true
-    }
-}
-
-fn canvas(id: &str) -> CanvasElement {
-    document()
-        .query_selector(&format!("#{}", id))
-        .unwrap()
-        .expect(&format!("Failed to select canvas id #{}", id))
-        .try_into()
-        .unwrap()
 }
 
 #[derive(Debug, Deserialize, Serialize)]

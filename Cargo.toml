@@ -11,7 +11,7 @@ serde = "1.0.104"
 serde_derive = "1.0.104"
 stdweb = "0.4.20"
 stdweb-derive = "0.5.3"
-yew = "0.11.0"
+yew = { git = "https://github.com/yewstack/yew" }
 
 [dependencies.rand]
 version = "0.7.3"
